@@ -7,7 +7,49 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '''
 
+from dataclasses import dataclass, field
+from typing import Literal
+import numpy as np
+from ampyc.noise import ZeroNoise
+
 from ampyc.systems import SystemBase
+from ampyc.typing import Noise
+
+
+@dataclass
+class LinearSystemParams:
+    A: np.ndarray
+    B: np.ndarray
+    C: np.ndarray
+    D: np.ndarray | Literal[0] = 0
+
+    n: int = field(init=False)
+    m: int = field(init=False)
+    p: int = field(init=False)
+
+    A_u: np.ndarray | None = None
+    b_u: np.ndarray | None = None
+    A_x: np.ndarray | None = None
+    b_x: np.ndarray | None = None
+    A_w: np.ndarray | None = None
+    b_w: np.ndarray | None = None
+
+    noise_generator: Noise = None
+
+    def __post_init__(self):
+        self.n = self.A.shape[0]
+        self.m = self.B.shape[1]
+        self.p = self.C.shape[0]
+        assert self.A.shape == (self.n, self.n)
+        assert self.B.shape == (self.n, self.m)
+        assert self.C.shape == (self.p, self.n)
+        if self.D == 0:
+            self.D = np.zeros((self.p, self.m))
+        else:
+            assert self.D.shape == (self.p, self.m)
+        if self.noise_generator is None:
+            self.noise_generator = ZeroNoise(self.n)
+
 
 class LinearSystem(SystemBase):
     '''
@@ -18,8 +60,9 @@ class LinearSystem(SystemBase):
 
     where :math:`x` is the state, :math:`u` is the input, :math:`y` is the output, and :math:`w` is a disturbance.
     '''
-    
-    def update_params(self, params):
+    Params = LinearSystemParams
+
+    def update_params(self, params: LinearSystemParams):
         super().update_params(params)
         assert params.A.shape == (self.n, self.n), 'A must have shape (n,n)'
         assert params.B.shape == (self.n, self.m), 'B must have shape (n,m)'
