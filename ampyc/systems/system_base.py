@@ -9,10 +9,16 @@
 
 from abc import ABC, abstractmethod
 import numpy as np
+import functools
+from typing import TypeVar, Callable, Sequence, Any
 
-from ampyc.typing import Params, System
+
 from ampyc.utils import Polytope
+from ampyc.noise import NoiseBase
 
+
+ArrayLike = TypeVar('ArrayLike')
+ArrayBackend = Callable[[Sequence[Any]], ArrayLike]
 
 class SystemBase(ABC):
     '''
@@ -26,8 +32,7 @@ class SystemBase(ABC):
 
     where :math:`x` is the state, :math:`u` is the input, :math:`y` is the output, and :math:`w` is a disturbance.
 
-    This class is an abstract base class and should not be instantiated directly. Instead, derive a system from
-    this class and implement the following required methods:
+    The following methods must be implemented by derived classes:
     - update_params: update the system parameters, e.g., after a change in the system dimensions. This is also called
                      during initialization.
     - f: state update function to be implemented by the inherited class
@@ -43,7 +48,7 @@ class SystemBase(ABC):
         and returns both :math:`x_{k+1}` and :math:`y_k`
     '''
 
-    def __init__(self, params: Params) -> System:
+    def __init__(self, *args, **kwargs):
         '''
         Default constructor for the system base class. This method should not be overridden by derived systems, use
         update_params instead.
@@ -51,9 +56,15 @@ class SystemBase(ABC):
         Args:
             params: The system parameters derived from a ParamsBase dataclass.
         '''
-        self.update_params(params)
+        self.update_params(*args, **kwargs)
 
-    def update_params(self, params: Params) -> None:
+    def update_params(
+        self,
+        n: int, m: int, p: int,
+        X: Polytope | tuple[np.ndarray, np.ndarray] | None = None,
+        U: Polytope | tuple[np.ndarray, np.ndarray] | None = None,
+        noise_generator: NoiseBase | None = None,
+    ) -> None:
         '''
         Updates the system parameters, e.g., after a change in the system dimensions.
 
@@ -62,65 +73,25 @@ class SystemBase(ABC):
         '''
 
         # system dimensions
-        self.n = params.n
-        self.m = params.m
+        self.n = n
+        self.m = m
+        self.p = p
 
         # store systems constraints as polytopes
-        if params.A_x is not None and params.b_x is not None:
-            self.X = Polytope(params.A_x, params.b_x)
+        def get_constraint_polytope(p: Polytope | tuple[np.ndarray, np.ndarray] | None, expected_dim: int) -> Polytope | None:
+            match p:
+                case None:
+                    return None
+                    # return Polytope(np.zeros((0, expected_dim)), np.zeros((0,)))
+                case A, b:
+                    return Polytope(A, b)
+                case c:
+                    return c
 
-        if params.A_u is not None and params.b_u is not None:
-            self.U = Polytope(params.A_u, params.b_u)
+        self.X = get_constraint_polytope(X, self.n)
+        self.U = get_constraint_polytope(U, self.m)
 
-        if params.A_w is not None and params.b_w is not None:
-            self.W = Polytope(params.A_w, params.b_w)
-
-        # noise generator
-        self.noise_generator = params.noise_generator
-
-        # handle the case of state dependent noise
-        if self.noise_generator.state_dependent:
-            self.G = self.noise_generator.G
-        
-    def get_state(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
-        '''
-        Advance system from state x with input u, and adding a disturbance.
-        
-        Args:
-            x: Current state of the system
-            u: Input to the system
-        Returns:
-            x_next: Next state of the system after applying the input and adding a disturbance
-                    sampled from the noise generator.
-        '''
-        x_next = self.f(x, u)
-
-        # make sure that x_next is a numpy array
-        if not isinstance(x_next, np.ndarray):
-            x_next = np.array(x_next)
-
-        noise = self.noise_generator.generate(x) \
-            if self.noise_generator.state_dependent else self.noise_generator.generate()
-
-        return x_next + noise
-
-    def get_output(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
-        '''
-        Evaluate output function for state x and input u.
-        
-        Args:
-            x: Current state of the system
-            u: Input to the system
-        Returns:
-            output: Output of the system after evaluating the output function.
-        '''
-        output = self.h(x, u)
-
-        # make sure that output is a numpy array
-        if not isinstance(output, np.ndarray):
-            output = np.array(output)
-
-        return output
+        self.noise_generator = noise_generator
 
     def step(self, x: np.ndarray, u: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         '''
@@ -134,39 +105,54 @@ class SystemBase(ABC):
             x_next: Next state of the system after applying the input and adding a disturbance.
             output: Output of the system after evaluating the output function.
         '''
-        x_next = self.get_state(x, u)
-        output = self.get_output(x, u)
+        w = None
+        if self.noise_generator is not None:
+            w = self.noise_generator.generate()
+        x_next = self.f(x, u, w)
+        output = self.h(x, u, w)
         return x_next, output
 
-    @classmethod
+    def f(self, x, u, *args, **kwargs):
+        self._check_x_shape(x)  # make sure x is n dimensional
+        self._check_u_shape(u)  # make sure u is m dimensional
+        return self._f(x, u, *args, **kwargs)
+
+    def h(self, x, u, *args, **kwargs):
+        self._check_x_shape(x)  # make sure x is n dimensional
+        self._check_u_shape(u)  # make sure u is m dimensional
+        return self._h(x, u, *args, **kwargs)
+
     @abstractmethod
-    def f(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
+    def _f(self, x: ArrayLike, u: ArrayLike, w: ArrayLike | None, *,
+        array_backend: ArrayBackend = np.array,
+    ) -> ArrayLike:
         '''
-        Nominal (i.e. without additive disturbance) system update function to be implemented by the inherited class.
-        
+        Nominal system update function to be implemented by the inherited class.
+
         Args:
             x: Current state of the system
             u: Input to the system
+            w: Noise, optional
         Returns:
             x_next: Next state of the system after applying the input.
-        Note:
-            This method should not include any noise or disturbance.
         '''
-        raise NotImplementedError
+        ...
 
-    @classmethod
     @abstractmethod
-    def h(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
+    def _h(self, x: ArrayLike, u: ArrayLike, w: ArrayLike | None, *,
+        array_backend: ArrayBackend = np.array,
+    ) -> ArrayLike:
         '''
         System output function to be implemented by the inherited class.
-        
+
         Args:
             x: Current state of the system
             u: Input to the system
+            w: Noise, optional.
         Returns:
             output: Output of the system after evaluating the output function.
         '''
-        raise NotImplementedError
+        ...
 
     def _check_x_shape(self, x: np.ndarray) -> None:
         '''

@@ -12,4 +12,3 @@ from typing import TypeVar
 System = TypeVar('System')
 Params = TypeVar('Params')
 Controller = TypeVar('Controller')
-Noise = TypeVar('Noise')

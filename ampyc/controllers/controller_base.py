@@ -35,24 +35,17 @@ class ControllerBase(ABC):
         prob: optimization problem object, either a CVXPY Problem or a CasADi Opti object
     '''
 
-    def __init__(self, sys: System, params: Params, *args: Optional, **kwargs: Optional) -> Controller:
+    def __init__(self, solver=None, timing=False) -> Controller:
         '''
-        Default constructor for the controller. This method should not be overridden by derived controllers, use
-        _init_problem instead.
-
         Args:
             sys: system object derived from SystemBase
             params: parameters object derived from ParamsBase
             *args: additional arguments for the controller
             **kwargs: additional keyword arguments for the controller
         '''
-        self.sys = sys
-        self.params = params
-        self.solver = kwargs.pop('solver', None)
-        self.timing = kwargs.pop('timing', False)
-        self._init_problem(sys, params, *args, **kwargs)
-        self.output_mapping = self._define_output_mapping()
-    
+        self.solver = solver
+        self.timing = timing
+
     @classmethod
     @abstractmethod
     def _init_problem(self, sys: System, params: Params, *args: Optional, **kwargs: Optional) -> None:
@@ -80,9 +73,8 @@ class ControllerBase(ABC):
         '''
         pass
 
-    @classmethod
     @abstractmethod
-    def _define_output_mapping(self) -> None:
+    def _define_output_mapping(self) -> dict[str, 'Variable']:
         '''
         Depending on the controller, the final output of the controller may correspond to different variables. For example,
         in case of LQR controllers, the output is the optimal control input and the predicted state trajectory over the
@@ -138,8 +130,9 @@ class ControllerBase(ABC):
             if not hasattr(self, 'x_0'):
                 raise Exception(
                     'The MPC problem must define the initial condition as an optimization parameter self.x_0')
-            
-            out_map = self.output_mapping.copy()
+
+            output_mapping = self._define_output_mapping()
+            out_map = {}
 
             # reshape x to match the expected shape of the initial condition
             x = x.reshape(self.x_0.shape)
@@ -152,13 +145,13 @@ class ControllerBase(ABC):
 
                     if self.prob.status != cp.OPTIMAL:
                         error_msg = 'Solver did not achieve an optimal solution. Status: {0}'.format(self.prob.status)
-                        for mapping in self.output_mapping:
+                        for mapping in output_mapping:
                             out_map[mapping] = None
 
                     else:
                         error_msg = None
                         for mapping in self.output_mapping:
-                            out_map[mapping] = self.output_mapping[mapping].value
+                            out_map[mapping] = output_mapping[mapping].value
                             if self.timing:
                                 out_map["timing"] = self.prob.solver_stats.solve_time
                     control = out_map['control']
@@ -194,13 +187,13 @@ class ControllerBase(ABC):
                     sol = self.prob.solve()
                     if sol.stats()['success']:
                         error_msg = None
-                        for mapping in self.output_mapping:
-                            out_map[mapping] = sol.value(self.output_mapping[mapping])
+                        for mapping in output_mapping:
+                            out_map[mapping] = sol.value(output_mapping[mapping])
                             if self.timing:
                                 out_map["timing"] = sum([v for k, v in sol.stats().items() if 't_wall' in k])
                     else:
                         error_msg = 'Solver was not successful with return status: {0}'.format(sol.stats()['return_status'])
-                        for mapping in self.output_mapping:
+                        for mapping in output_mapping:
                             out_map[mapping] = None
                             if self.timing:
                                 out_map["timing"] = None
@@ -209,7 +202,7 @@ class ControllerBase(ABC):
                     state = out_map['state']
                 except Exception as e:
                     error_msg = 'Solver encountered an error. {0}'.format(e)
-                    for mapping in self.output_mapping:
+                    for mapping in output_mapping:
                             out_map[mapping] = None
                     control = out_map['control']
                     state = out_map['state']

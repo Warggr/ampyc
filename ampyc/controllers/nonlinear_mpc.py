@@ -8,7 +8,9 @@
 '''
 
 import casadi
+import numpy as np
 
+from ampyc.systems import SystemBase
 from ampyc.controllers import ControllerBase
 
 class NonlinearMPC(ControllerBase):
@@ -22,29 +24,51 @@ class NonlinearMPC(ControllerBase):
     https://github.com/IntelligentControlSystems/ampyc/notes/02_nominalMPC.pdf
     '''
 
-    def _init_problem(self, sys, params, *args, **kwargs):
+    def __init__(
+        self,
+        N: int = 10,
+        Q: np.ndarray | float = 1,
+        R: np.ndarray | float = 10,
+        #name: str = 'nominal linear MPC',
+        *args, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        #self.name = name
+        self.N = N
+        self.Q = Q
+        self.R = R
+
+    def _init_problem(self, sys):
+        Q, R = self.Q, self.R
+        if isinstance(Q, (float, int)):
+            Q = Q * np.eye(sys.n)
+        if isinstance(self.R, (float, int)):
+            R = R * np.eye(sys.m)
+
         # init casadi Opti object which holds the optimization problem
         self.prob = casadi.Opti()
 
         # define optimization variables
-        self.x = self.prob.variable(sys.n, params.N+1)
-        self.u = self.prob.variable(sys.m, params.N)
+        self.x = self.prob.variable(sys.n, self.N+1)
+        self.u = self.prob.variable(sys.m, self.N)
         self.x_0 = self.prob.parameter(sys.n)
 
         # define the objective
         objective = 0.0
-        for i in range(params.N):
-            objective += self.x[:, i].T @ params.Q @ self.x[:, i] + self.u[:, i].T @ params.R @ self.u[:, i]
+        for i in range(self.N):
+            objective += self.x[:, i].T @ Q @ self.x[:, i] + self.u[:, i].T @ R @ self.u[:, i]
         # NOTE: terminal cost is trivially zero due to terminal constraint
         self.objective = objective
         self.prob.minimize(objective)
 
         # define the constraints
         self.prob.subject_to(self.x[:, 0] == self.x_0)
-        for i in range(params.N):
-            self.prob.subject_to(self.x[:, i+1] == sys.f(self.x[:, i], self.u[:, i]))
-            self.prob.subject_to(sys.X.A @ self.x[:, i] <= sys.X.b)
-            self.prob.subject_to(sys.U.A @ self.u[:, i] <= sys.U.b)
+        for i in range(self.N):
+            self.prob.subject_to(self.x[:, i+1] == sys.f(self.x[:, i], self.u[:, i], array_backend=casadi.vcat))
+            if sys.X is not None:
+                self.prob.subject_to(sys.X.A @ self.x[:, i] <= sys.X.b)
+            if sys.U is not None:
+                self.prob.subject_to(sys.U.A @ self.u[:, i] <= sys.U.b)
         self.prob.subject_to(self.x[:, -1] == 0.0)
 
     def _define_output_mapping(self):

@@ -22,24 +22,46 @@ class MPC(ControllerBase):
     https://github.com/IntelligentControlSystems/ampyc/notes/01_intro.pdf
     '''
 
-    def _init_problem(self, sys, params, *args, **kwargs):
+    def __init__(
+        self,
+        N: int = 10,
+        Q: np.ndarray | float = 1,
+        R: np.ndarray | float = 10,
+        name: str = 'nominal linear MPC',
+    ):
+        self.name = name
+        self.N = N
+        self.Q = Q
+        self.R = R
+
+    def _init_problem(
+        self, sys: LinearSystem,
+    ):
+        Q, R = self.Q, self.R
+        if isinstance(Q, (float, int)):
+            Q = Q * np.eye(sys.n)
+        if isinstance(self.R, (float, int)):
+            R = R * np.eye(sys.m)
+
         # define optimization variables
-        self.x = cp.Variable((sys.n, params.N+1))
-        self.u = cp.Variable((sys.m, params.N))
+        self.x = cp.Variable((sys.n, self.N+1))
+        self.u = cp.Variable((sys.m, self.N))
         self.x_0 = cp.Parameter((sys.n))
 
         # define the objective
         objective = 0.0
-        for i in range(params.N):
-            objective += cp.quad_form(self.x[:, i], params.Q) + cp.quad_form(self.u[:, i], params.R)
+        for i in range(self.N):
+            objective += cp.quad_form(self.x[:, i], Q) + cp.quad_form(self.u[:, i], R)
         # NOTE: terminal cost is trivially zero due to terminal constraint
 
         # define the constraints
         constraints = [self.x[:, 0] == self.x_0]
-        for i in range(params.N):
+        for i in range(self.N):
             constraints += [self.x[:, i+1] == sys.A @ self.x[:, i] + sys.B @ self.u[:, i]]
-            constraints += [sys.X.A @ self.x[:, i] <= sys.X.b]
-            constraints += [sys.U.A @ self.u[:, i] <= sys.U.b]
+            if sys.X is not None:
+                constraints += [sys.X.A @ self.x[:, i] <= sys.X.b]
+            if sys.U is not None:
+                constraints += [sys.U.A @ self.u[:, i] <= sys.U.b]
         constraints += [self.x[:, -1] == 0.0]
 
         # define the CVX optimization problem object
