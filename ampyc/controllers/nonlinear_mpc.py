@@ -38,7 +38,10 @@ class NonlinearMPC(ControllerBase):
         self.Q = Q
         self.R = R
 
-    def _init_problem(self, sys):
+    def _init_problem(self, sys, track_x = 0):
+        if isinstance(track_x, (float, int)) and track_x == 0:
+            track_x = np.zeros(sys.m)
+
         Q, R = self.Q, self.R
         if isinstance(Q, (float, int)):
             Q = Q * np.eye(sys.n)
@@ -55,8 +58,11 @@ class NonlinearMPC(ControllerBase):
 
         # define the objective
         objective = 0.0
+        def quad_form(x, A):
+            return x.T @ A @ x
+
         for i in range(self.N):
-            objective += self.x[:, i].T @ Q @ self.x[:, i] + self.u[:, i].T @ R @ self.u[:, i]
+            objective += quad_form(self.x[:, i] - track_x, Q) + quad_form(self.u[:, i].T, R)
         # NOTE: terminal cost is trivially zero due to terminal constraint
         self.objective = objective
         self.prob.minimize(objective)
@@ -69,7 +75,7 @@ class NonlinearMPC(ControllerBase):
                 self.prob.subject_to(sys.X.A @ self.x[:, i] <= sys.X.b)
             if sys.U is not None:
                 self.prob.subject_to(sys.U.A @ self.u[:, i] <= sys.U.b)
-        self.prob.subject_to(self.x[:, -1] == 0.0)
+        self.prob.subject_to(self.x[:, -1] == track_x)
 
     def _define_output_mapping(self):
         return {

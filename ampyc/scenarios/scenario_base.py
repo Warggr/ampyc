@@ -32,6 +32,7 @@ class Scenario:
             x_0 (np.ndarray): Initial state for the simulation.
         '''
         x_0: np.ndarray
+        x_reference: np.ndarray | float = 0.0
         y_reference: np.ndarray | float = 0.0
         num_traj: int = 1
         num_steps: int = 150
@@ -40,6 +41,8 @@ class Scenario:
             print('Call Scenario.sim __post_init__')
             if np.isscalar(self.y_reference):
                 self.y_reference = self.y_reference * np.ones((self.num_steps, 1))
+            if np.isscalar(self.x_reference):
+                self.x_reference = self.x_reference * np.ones((self.num_steps, 1))
 
 
     def __init__(self, sys: SystemBase, sim: dict | None = None):
