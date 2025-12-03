@@ -68,7 +68,7 @@ class LinearSystem(SystemBase):
             q = 0
             self.B_w = 0
             self.D_w = 0
-            if self.noise_generator is not None:
+            if noise_generator is not None:
                 print('Warning: noise generator provided but not used', file=sys.stderr)
         else:
             q = B_w.shape[1] if not B_w_zero else D_w.shape[1]
@@ -83,15 +83,15 @@ class LinearSystem(SystemBase):
                 self.D_w = D_w
                 assert self.D_w.shape == (p, q), f"Expected D_w to have shape {p, q} but has shape {self.D_w.shape}"
         self.q = q
-        super().__init__(n=n, m=m, p=p, noise=noise_generator, **kwargs)
+        super().__init__(n=n, m=m, p=p, noise_generator=noise_generator, **kwargs)
 
     def _f(self, x: ArrayLike, u: ArrayLike, w: ArrayLike | None = None, **kwargs):
         result = (
-            self.A @ x.reshape(self.n, 1) +
-            self.B @ u.reshape(self.m, 1)
+            self.A @ x.reshape((self.n, 1)) +
+            self.B @ u.reshape((self.m, 1))
         )
         if w is not None:
-            result += self.B_w @ w.reshape(self.q, 1)
+            result += self.B_w @ w.reshape((self.q, 1))
         return result
 
     def _h(self, x: ArrayLike, u: ArrayLike, w: ArrayLike | None = None, **kwargs):
@@ -113,4 +113,6 @@ class LinearSystem(SystemBase):
             w = None
         x_new = self._f(x, u, w)
         y = self._h(x_new, u, w)
+        # If x was e.g. (2,) instead of (2, 1), return a consistent format
+        x_new = x_new.reshape(x.shape)
         return x_new, y

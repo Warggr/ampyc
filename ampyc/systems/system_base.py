@@ -63,6 +63,7 @@ class SystemBase(ABC):
         n: int, m: int, p: int,
         X: Polytope | tuple[np.ndarray, np.ndarray] | None = None,
         U: Polytope | tuple[np.ndarray, np.ndarray] | None = None,
+        Y: Polytope | tuple[np.ndarray, np.ndarray] | None = None,
         noise_generator: NoiseBase | None = None,
     ) -> None:
         '''
@@ -90,6 +91,7 @@ class SystemBase(ABC):
 
         self.X = get_constraint_polytope(X, self.n)
         self.U = get_constraint_polytope(U, self.m)
+        self.Y = get_constraint_polytope(Y, self.p)
 
         self.noise_generator = noise_generator
 

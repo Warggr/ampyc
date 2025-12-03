@@ -70,7 +70,13 @@ class NonlinearSegwaySystem(NonlinearSystem):
     ):
         noise_generator = PolytopeNoise(Polytope(params.A_w, params.b_w))
 
-        super().__init__(n=2, m=1, p=2, noise_generator=noise_generator)
+        super().__init__(
+            n=2, m=1, p=2,
+            X=(params.A_x, params.b_x),
+            U=(params.A_u, params.b_u),
+            Y=(params.A_x, params.b_x),
+            noise_generator=noise_generator,
+        )
         self.params = params
 
     def _f(self, x, u, w=None, *, array_backend: ArrayBackend = np):
@@ -108,4 +114,4 @@ class NonlinearSegway(Scenario):
 
     def __init__(self, sys: dict|None = None):
         sys_args = sys or {}
-        super().__init__(sys=NonlinearSegwaySystem(**sys_args), sim=None)
+        super().__init__(sys=NonlinearSegwaySystem(NonlinearSegwaySystem.Params(**sys_args)), sim=None)
