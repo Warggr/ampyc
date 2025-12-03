@@ -7,21 +7,47 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '''
 
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ampyc.typing import Params
 from ampyc.utils import Polytope
+
+
+def get_x_figure(fig_number: int) -> tuple[Figure, tuple[Axes, Axes]]:
+    # check if the figure number is already open
+    if plt.fignum_exists(fig_number):
+        fig = plt.figure(fig_number)
+        ax1 = fig.axes[0]
+        ax2 = fig.axes[1]
+    else:
+        fig, (ax1, ax2) = plt.subplots(2,1, num=fig_number, sharex=True)
+    return fig, (ax1, ax2)
+
+
+def plot_x_predictions(
+    fig_number: int,
+    predictions: list[np.ndarray],
+    color,
+    alpha: float = 0.5,
+    **kwargs,
+) -> None:
+    fig, (ax1, ax2) = get_x_figure(fig_number)
+    for i, pred in enumerate(predictions):
+        ax1.plot(range(i, i+pred.shape[1]), pred[0, :], **kwargs, color=color, alpha=alpha)
+        ax2.plot(range(i, i+pred.shape[1]), pred[1, :], **kwargs, color=color, alpha=alpha)
+
 
 def plot_x_state_time(
         fig_number: int,
         x: np.ndarray,
         X: Polytope | None,
-        params: Params,
         label: str | None = None,
         legend_loc: str = 'upper right',
         title: str | None = None,
         axes_labels: list[str] = ['x_1', 'x_2'],
+        **kwargs,
         ) -> None:
     '''
     Plots the state trajectory x over time, including the state constraint set X.
@@ -32,24 +58,18 @@ def plot_x_state_time(
         x (np.ndarray): The state trajectory, shape (N, n=2, T), where N is the number of time steps,
                         n is the state dimension, and T is the number of trajectories.
         X (Polytope | None): The state constraint set.
-        params (Params): Parameters for plotting, e.g., color, alpha, and linewidth.
         label (str | None): Label for the plot line.
         legend_loc (str): Location of the legend in the plot.
         title (str | None): Title of the plot.
         axes_labels (list[str]): Labels for the x and y axes.
+        **kwargs: All other arguments are passed to ax.plot()
     '''
 
-    # check if the figure number is already open
-    if plt.fignum_exists(fig_number):
-        fig = plt.figure(fig_number)
-        ax1 = fig.axes[0]
-        ax2 = fig.axes[1]
-    else:
-        fig, (ax1, ax2) = plt.subplots(2,1, num=fig_number, sharex=True)
+    fig, (ax1, ax2) = get_x_figure(fig_number)
 
     num_steps = x.shape[0]
 
-    ax1.plot(x[:,0], color=params.color, alpha=params.alpha, linewidth=params.linewidth, label=label)
+    ax1.plot(x[:,0], label=label, **kwargs)
     if X is not None:
         ax1.axline((-1, X.vertices[:,0].max()), slope=0, color='k', linewidth=2)
         ax1.axline((-1, X.vertices[:,0].min()), slope=0, color='k', linewidth=2)
@@ -64,8 +84,8 @@ def plot_x_state_time(
         handles, labels = ax1.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         ax1.legend(by_label.values(), by_label.keys(), loc=legend_loc)
-    
-    ax2.plot(x[:,1], color=params.color, alpha=params.alpha, linewidth=params.linewidth)
+
+    ax2.plot(x[:, 1], **kwargs)
     if X is not None:
         ax2.axline((-1, X.vertices[:,1].max()), slope=0, color='k', linewidth=2)
         ax2.axline((-1, X.vertices[:,1].min()), slope=0, color='k', linewidth=2)
@@ -80,11 +100,11 @@ def plot_x_state_time(
 def plot_x_state_state(fig_number: int,
                        x: np.ndarray,
                        X: Polytope | None,
-                       params: Params,
                        label: str | None = None,
                        legend_loc: str = 'upper right',
                        title: str | None = None,
-                       axes_labels: list[str] = ['x_1', 'x_2']
+                       axes_labels: list[str] = ['x_1', 'x_2'],
+                       **kwargs,
                        ) -> None:
     '''
     Plots the state trajectory x in the state space, including the state constraint set X.
@@ -110,7 +130,7 @@ def plot_x_state_state(fig_number: int,
         ax = plt.gca()
 
     ax.scatter(x[0,0], x[0,1], marker='o', facecolors='none', color='k', label='initial state')
-    ax.plot(x[:,0], x[:,1], color=params.color, alpha=params.alpha, linewidth=params.linewidth, label=label)
+    ax.plot(x[:,0], x[:,1], label=label, **kwargs)
     if X is not None:
         X.plot(ax=ax, fill=False, edgecolor="k", alpha=1, linewidth=2, linestyle='-') 
     ax.set_xlabel(axes_labels[0])

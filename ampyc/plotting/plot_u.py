@@ -10,17 +10,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ampyc.typing import Params
 from ampyc.utils import Polytope
 
 def plot_u(fig_number: int,
            u: np.ndarray,
            U: Polytope | None,
-           params: Params,
            label: str | None = None,
            legend_loc: str = 'upper right',
            title: str | None = None,
            axes_labels: list[str] = ['u'],
+           **kwargs,
            ) -> None:
     '''
     Plots the control input u over time, including the input constraint set U.
@@ -31,11 +30,11 @@ def plot_u(fig_number: int,
         u (np.ndarray): The control input trajectory, shape (N, m=1, T), where N is the number of trajectories,
                         m is the control dimension, and T is the number of time steps.
         U (Polytope | None): The input constraint set.
-        params (Params): Parameters for plotting, e.g., color, alpha, and linewidth.
         label (str | None): Label for the plot line.
         legend_loc (str): Location of the legend in the plot.
         title (str | None): Title of the plot.
         axes_labels (list[str]): Label for the y axes.
+        kwargs: All other arguments are passed to ax.plot().
     '''
     # check if the figure number is already open
     if plt.fignum_exists(fig_number):
@@ -44,10 +43,10 @@ def plot_u(fig_number: int,
     else:
         fig = plt.figure(fig_number)
         ax = plt.gca()
-    
+
     num_steps = u.shape[0]
 
-    ax.plot(u, color=params.color, alpha=params.alpha, linewidth=params.linewidth, label=label)
+    ax.plot(u, **kwargs, label=label)
     if U is not None:
         ax.axline((-1, U.vertices.max()), slope=0, color='k', linewidth=2)
         ax.axline((-1, U.vertices.min()), slope=0, color='k', linewidth=2)
