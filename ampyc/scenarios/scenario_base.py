@@ -38,14 +38,13 @@ class Scenario:
         num_steps: int = 150
 
         def __post_init__(self):
-            print('Call Scenario.sim __post_init__')
             if np.isscalar(self.y_reference):
                 self.y_reference = self.y_reference * np.ones((self.num_steps, 1))
             if np.isscalar(self.x_reference):
                 self.x_reference = self.x_reference * np.ones((self.num_steps, 1))
 
 
-    def __init__(self, sys: SystemBase, sim: dict | None = None):
+    def __init__(self, sys: SystemBase, sim: dict | None = None, name: str | None = None):
         """
         Build dataclasses for controller, system, simulation, and plotting parameters.
 
@@ -57,6 +56,8 @@ class Scenario:
         print('Call self.sim() @', self.sim)
         self.sim = self.sim() if sim is None else self.sim(**sim)
 
+        if name is not None:
+            self.name = name
         print(f'Successfully initialized experiment \'{self.name}\'.')
 
     def __repr__(self) -> str:

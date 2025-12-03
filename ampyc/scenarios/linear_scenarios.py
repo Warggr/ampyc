@@ -30,3 +30,16 @@ class SpringMass(Scenario):
             sys=sys,
             sim=dict(**sim, x_0=amplitude, y_reference=1),
         )
+
+
+class SingleIntegrator(Scenario):
+    name = "Single integrator"
+
+    def __init__(self):
+        super().__init__(
+            sys=LinearSystem(A=np.eye(1), B=np.eye(1), C=np.eye(1)),
+            sim=dict(
+                x_0=np.array([2.0]),
+                num_steps=120,
+            ),
+        )
