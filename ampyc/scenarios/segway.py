@@ -8,8 +8,8 @@
 '''
 
 from dataclasses import dataclass, field
+from ampyc.systems.system_base import ArrayBackend
 import numpy as np
-import casadi
 
 from ampyc.noise import NoiseBase, PolytopeNoise
 from ampyc.utils import Polytope
@@ -73,7 +73,7 @@ class NonlinearSegwaySystem(NonlinearSystem):
         super().__init__(n=2, m=1, p=2, noise_generator=noise_generator)
         self.params = params
 
-    def _f(self, x, u, w=None, **kwargs):
+    def _f(self, x, u, w=None, *, array_backend: ArrayBackend = np):
         '''
         Nonlinear dynamics function for the inverted pendulum (segway) system.
 
@@ -82,10 +82,10 @@ class NonlinearSegwaySystem(NonlinearSystem):
             u (casadi.SX or casadi.MX): Control input (force).
         '''
         params = self.params
-        x_next = casadi.vertcat(
+        x_next = array_backend.array([
             x[0] + params.dt*x[1],
-            x[1] + params.dt*(-params.k*x[0] - params.c*x[1] + casadi.sin(x[0])*params.g/params.l + u)
-        )
+            x[1] + params.dt*(-params.k*x[0] - params.c*x[1] + array_backend.sin(x[0])*params.g/params.l + u[0])
+        ])
         return x_next
 
     def _h(self, x, u, w=None, **kwargs):

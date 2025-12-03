@@ -103,11 +103,12 @@ class LinearSystem(SystemBase):
             result += self.D_w @ w.reshape(self.q, 1)
         return result
 
-    def step(self, x, u):
+    def step(self, x, u, *, array_backend: ArrayBackend = np):
         self._check_x_shape(x)  # make sure x is n dimensional
         self._check_u_shape(u)  # make sure u is m dimensional
         if self.q != 0:
             w = self.noise_generator._generate()
+            w = array_backend.asarray(w)
         else:
             w = None
         x_new = self._f(x, u, w)

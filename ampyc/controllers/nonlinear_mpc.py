@@ -13,6 +13,20 @@ import numpy as np
 from ampyc.systems import SystemBase
 from ampyc.controllers import ControllerBase
 
+
+class CasadiWrapper:
+    @staticmethod
+    def array(*args, **kwargs):
+        return casadi.vcat(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        """Forward every attribute lookup to casadi
+
+        e.g, CasadiWrapper.sin() := casadi.sin()
+        """
+        return getattr(casadi, attr)
+
+
 class NonlinearMPC(ControllerBase):
     '''
     Implements a standard nonlinear nominal MPC controller, see e.g. Section 2.5.5 in:
@@ -70,7 +84,7 @@ class NonlinearMPC(ControllerBase):
         # define the constraints
         self.prob.subject_to(self.x[:, 0] == self.x_0)
         for i in range(self.N):
-            self.prob.subject_to(self.x[:, i+1] == sys.f(self.x[:, i], self.u[:, i], array_backend=casadi.vcat))
+            self.prob.subject_to(self.x[:, i+1] == sys.f(self.x[:, i], self.u[:, i], array_backend=CasadiWrapper()))
             if sys.X is not None:
                 self.prob.subject_to(sys.X.A @ self.x[:, i] <= sys.X.b)
             if sys.U is not None:

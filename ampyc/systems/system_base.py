@@ -93,7 +93,7 @@ class SystemBase(ABC):
 
         self.noise_generator = noise_generator
 
-    def step(self, x: np.ndarray, u: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def step(self, x: np.ndarray, u: np.ndarray, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         '''
         Advances the system by one time step, given state x & input u and returns the output.
         This method calls get_state and get_output methods in sequence.
@@ -108,8 +108,8 @@ class SystemBase(ABC):
         w = None
         if self.noise_generator is not None:
             w = self.noise_generator.generate()
-        x_next = self.f(x, u, w)
-        output = self.h(x, u, w)
+        x_next = self.f(x, u, w, **kwargs)
+        output = self.h(x, u, w, **kwargs)
         return x_next, output
 
     def f(self, x, u, *args, **kwargs):

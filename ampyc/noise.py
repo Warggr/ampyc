@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from ampyc.utils import Polytope, qhull
+from utils.wrappers import ArrayBackend, ArrayLike
+
 
 class NoiseBase(ABC):
     """Base class for random noise/disturbance generators"""
@@ -18,12 +20,12 @@ class NoiseBase(ABC):
     state_dependent: bool = False
     rng: np.random.Generator | None = None
 
-    def generate(self, N: int | None = None) -> np.ndarray:
+    def generate(self, N: int | None = None) -> ArrayLike:
         return self._generate(N)
 
     @classmethod
     @abstractmethod
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None) -> ArrayLike:
         """Noise generation method to be implemented by the inherited class"""
         raise NotImplementedError
 
@@ -43,7 +45,7 @@ class ZeroNoise(NoiseBase):
     def __init__(self, dim: int) -> None:
         self.dim = dim
 
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None) -> ArrayLike:
         sample = np.zeros((self.dim, 1)) if N is None else np.zeros((self.dim, N))
         return sample
 
@@ -51,7 +53,7 @@ class ZeroNoise(NoiseBase):
 class GaussianNoise(NoiseBase):
     """Computes Gaussian disturbance based on noise mean and covariance"""
 
-    def __init__(self, mean: np.ndarray, covariance: np.ndarray, seed: int | None = None) -> None:
+    def __init__(self, mean: ArrayLike, covariance: ArrayLike, seed: int | None = None) -> None:
         assert len(covariance.shape) == 2 and covariance.shape[0] == covariance.shape[1]
         assert len(mean) == covariance.shape[0]
         assert seed is None or seed >= 0
@@ -59,7 +61,7 @@ class GaussianNoise(NoiseBase):
         self.cov = covariance
         self.rng = np.random.default_rng(seed)
 
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None, *, array_backend: ArrayBackend = np) -> ArrayLike:
         if N is None:
             sample = self.rng.multivariate_normal(
                 self.mean, self.cov, check_valid="raise"
@@ -74,13 +76,13 @@ class GaussianNoise(NoiseBase):
 class TruncGaussianNoise(GaussianNoise):
     """Computes Gaussian disturbance based on noise mean and covariance in the set A_w * w <= b_w"""
 
-    def __init__(self, mean: np.ndarray, covariance: np.ndarray, W: Polytope, max_iters: int = 1e4, seed: int | None = None) -> None:
+    def __init__(self, mean: ArrayLike, covariance: ArrayLike, W: Polytope, max_iters: int = 1e4, seed: int | None = None) -> None:
         assert seed is None or seed >= 0
         super().__init__(mean, covariance, seed=seed)
         self.trunc_bounds = W
         self.max_iters = max_iters
 
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None) -> ArrayLike:
         if N is not None:
             print("[Warning] N is ignored for truncated Gaussian noise, returning a single sample instead.")
         iters = 0
@@ -101,7 +103,7 @@ class PolytopeVerticesNoise(NoiseBase):
         self.V = W.V
         self.rng = np.random.default_rng(seed)
 
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None) -> ArrayLike:
         if N is None:
             idx = self.rng.choice(self.V.shape[0])
             sample = self.V[idx, :].reshape(-1, 1)
@@ -119,7 +121,7 @@ class PolytopeNoise(NoiseBase):
         self.V = W.V
         self.rng = np.random.default_rng(seed)
 
-    def _generate(self, N: int | None = None) -> np.ndarray:
+    def _generate(self, N: int | None = None) -> ArrayLike:
         """Based on implementation for randomPoint() in MPT"""
         if N is None:
             L = self.rng.uniform(size=(1, self.V.shape[0]))
@@ -137,12 +139,12 @@ class StateDependentNoiseBase(NoiseBase):
 
     state_dependent = True
 
-    def generate(self, x: np.ndarray) -> np.ndarray:
+    def generate(self, x: ArrayLike) -> ArrayLike:
         return self._generate(x)
 
     @classmethod
     @abstractmethod
-    def _generate(self, x: np.ndarray) -> np.ndarray:
+    def _generate(self, x: ArrayLike) -> ArrayLike:
         """Noise generation method to be implemented by the inherited class"""
         raise NotImplementedError
     
@@ -150,12 +152,12 @@ class StateDependentNoiseBase(NoiseBase):
 class StateDependentNoise(StateDependentNoiseBase):
     """Generates state dependent noise based on a linear transformation G and a random uniform scalar in [0,1]"""
 
-    def __init__(self, G: np.ndarray, seed: int | None = None) -> None:
+    def __init__(self, G: ArrayLike, seed: int | None = None) -> None:
         assert seed is None or seed >= 0
         self.G = G
         self.rng = np.random.default_rng(seed)
 
-    def _generate(self, x: np.ndarray) -> np.ndarray:
+    def _generate(self, x: ArrayLike) -> ArrayLike:
         return (self.rng.uniform() * self.G @ x).reshape(-1,1)
 
 
