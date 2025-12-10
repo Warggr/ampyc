@@ -112,6 +112,10 @@ class NonlinearSegway(Scenario):
         x_0: np.ndarray = field(default_factory=lambda: np.array([np.deg2rad(20), 0]))
         y_reference = 0
 
-    def __init__(self, sys: dict|None = None):
+    def __init__(self, sys: dict|None = None, sim: dict|None = None):
         sys_args = sys or {}
-        super().__init__(sys=NonlinearSegwaySystem(NonlinearSegwaySystem.Params(**sys_args)), sim=None)
+        sim_args = sim or {}
+        super().__init__(
+            sys=NonlinearSegwaySystem(NonlinearSegwaySystem.Params(**sys_args)),
+            sim=sim_args,
+        )
