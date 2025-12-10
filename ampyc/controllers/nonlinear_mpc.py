@@ -10,8 +10,9 @@
 import casadi
 import numpy as np
 
-from ampyc.systems import SystemBase
 from ampyc.controllers import ControllerBase
+from ampyc.utils import Polytope
+from typing import Literal
 
 
 class CasadiWrapper:
@@ -44,6 +45,7 @@ class NonlinearMPC(ControllerBase):
         Q: np.ndarray | float = 1,
         R: np.ndarray | float = 10,
         #name: str = 'nominal linear MPC',
+        X_f: Polytope | Literal[0] | None = 0,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -51,6 +53,7 @@ class NonlinearMPC(ControllerBase):
         self.N = N
         self.Q = Q
         self.R = R
+        self.X_f = X_f
 
     def _init_problem(self, sys, track_x = 0):
         if isinstance(track_x, (float, int)) and track_x == 0:
@@ -61,6 +64,9 @@ class NonlinearMPC(ControllerBase):
             Q = Q * np.eye(sys.n)
         if isinstance(self.R, (float, int)):
             R = R * np.eye(sys.m)
+        X_f = self.X_f
+        if isinstance(X_f, (float, int)) and X_f == 0:
+            X_f = Polytope(A=np.concat([np.eye(sys.n), -np.eye(sys.n)]), b=np.zeros((2*sys.n,)))
 
         # init casadi Opti object which holds the optimization problem
         self.prob = casadi.Opti()
@@ -89,7 +95,7 @@ class NonlinearMPC(ControllerBase):
                 self.prob.subject_to(sys.X.A @ self.x[:, i] <= sys.X.b)
             if sys.U is not None:
                 self.prob.subject_to(sys.U.A @ self.u[:, i] <= sys.U.b)
-        self.prob.subject_to(self.x[:, -1] == track_x)
+        self.prob.subject_to(X_f.A @ (self.x[:, -1] - track_x) <= X_f.b)
 
     def _define_output_mapping(self):
         return {
