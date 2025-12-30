@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from ampyc.utils import Polytope, qhull
-from utils.wrappers import ArrayBackend, ArrayLike
+from ampyc.utils.wrappers import ArrayBackend, ArrayLike
 
 
 class NoiseBase(ABC):
