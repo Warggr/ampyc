@@ -8,7 +8,9 @@
 '''
 
 import cvxpy as cp
+import numpy as np
 
+from ampyc.systems import LinearSystem
 from ampyc.controllers import ControllerBase
 
 class MPC(ControllerBase):
