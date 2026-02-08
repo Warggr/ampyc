@@ -19,6 +19,12 @@ class NoiseBase(ABC):
     rng: np.random.Generator | None = None
 
     def generate(self, N: int | None = None) -> np.ndarray:
+        """
+        Generates a noise sample.
+
+        Returns:
+            w, array of size (N, 1)
+        """
         return self._generate(N)
 
     @classmethod
