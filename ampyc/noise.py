@@ -98,8 +98,15 @@ class PolytopeVerticesNoise(NoiseBase):
 
     def __init__(self, W: Polytope, seed: int | None = None) -> None:
         assert seed is None or seed >= 0
+        self.W = W
         self.V = W.V
         self.rng = np.random.default_rng(seed)
+
+    def seed(self, seed: int | None = None):
+        super().seed(seed)
+        np.random.seed(seed)
+        self.W.vertices = None  # trigger new Vrep computation
+        self.V = self.W.Vrep()
 
     def _generate(self, N: int | None = None) -> np.ndarray:
         if N is None:
@@ -116,8 +123,15 @@ class PolytopeNoise(NoiseBase):
 
     def __init__(self, W: Polytope, seed: int | None = None) -> None:
         assert seed is None or seed >= 0
+        self.W = W
         self.V = W.V
         self.rng = np.random.default_rng(seed)
+
+    def seed(self, seed: int | None = None):
+        super().seed(seed)
+        np.random.seed(seed)
+        self.W.vertices = None  # trigger new Vrep computation
+        self.V = self.W.Vrep()
 
     def _generate(self, N: int | None = None) -> np.ndarray:
         """Based on implementation for randomPoint() in MPT"""
