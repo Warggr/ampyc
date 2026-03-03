@@ -14,30 +14,41 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 from ampyc.utils import Polytope
+import math
 
 
-def get_x_figure(fig_number: int) -> tuple[Figure, tuple[Axes, Axes]]:
+def get_x_figure(fig_number: int, expected_num_axes: int = 2) -> tuple[Figure, list[Axes]]:
     # check if the figure number is already open
     if plt.fignum_exists(fig_number):
         fig = plt.figure(fig_number)
-        ax1 = fig.axes[0]
-        ax2 = fig.axes[1]
+        axes = fig.axes
     else:
-        fig, (ax1, ax2) = plt.subplots(2,1, num=fig_number, sharex=True)
-    return fig, (ax1, ax2)
+        if expected_num_axes <= 5:
+            rows, cols = expected_num_axes, 1
+        elif expected_num_axes <= 12:
+            rows, cols = math.ceil(expected_num_axes / 2), 2
+        else:
+            rows = math.ceil(math.sqrt(expected_num_axes))
+            cols = math.ceil(expected_num_axes / rows)
+        fig, axes = plt.subplots(rows, cols, num=fig_number, sharex=True, sharey=True)
+        if expected_num_axes == 1:
+            axes = [axes]
+        else:
+            axes = list(axes.flatten())
+    return fig, axes
 
 
 def plot_x_predictions(
     fig_number: int,
     predictions: list[np.ndarray],
-    color,
     alpha: float = 0.5,
     **kwargs,
 ) -> None:
-    fig, (ax1, ax2) = get_x_figure(fig_number)
+    prediction_dim = predictions[0].shape[1]
+    _, axes = get_x_figure(fig_number, prediction_dim)
     for i, pred in enumerate(predictions):
-        ax1.plot(range(i, i+pred.shape[1]), pred[0, :], **kwargs, color=color, alpha=alpha)
-        ax2.plot(range(i, i+pred.shape[1]), pred[1, :], **kwargs, color=color, alpha=alpha)
+        for j in range(prediction_dim):
+            axes[j].plot(range(i, i+pred.shape[0]), pred[:, j], **kwargs, alpha=alpha)
 
 
 def plot_constraints(
@@ -60,6 +71,7 @@ def plot_x_state_time(
         legend_loc: str = 'upper right',
         title: str | None = None,
         axes_labels: list[str] | None = None,
+        x_label: str = 'time',
         **kwargs,
         ) -> None:
     '''
@@ -82,7 +94,7 @@ def plot_x_state_time(
     if axes_labels is None:
         axes_labels = [f'x_{{{i+1}}}' for i in range(n)]
 
-    fig, axes = get_x_figure(fig_number)
+    fig, axes = get_x_figure(fig_number, expected_num_axes=n)
 
     num_steps = x.shape[0]
 
@@ -92,7 +104,7 @@ def plot_x_state_time(
             kwargs['label'] = label
         ax.plot(x[:,i], **kwargs)
         if i == n - 1:
-            ax.set_xlabel('time')
+            ax.set_xlabel(x_label)
         ax.set_ylabel(axes_labels[i])
         ax.set_xlim([0, num_steps])
         ax.grid(visible=True)

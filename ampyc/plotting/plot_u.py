@@ -20,6 +20,7 @@ def plot_u(fig_number: int,
            legend_loc: str = 'upper right',
            title: str | None = None,
            axes_labels: list[str] = ['u'],
+           x_label: str = 'time',
            **kwargs,
            ) -> None:
     '''
@@ -50,7 +51,7 @@ def plot_u(fig_number: int,
     ax.plot(u, **kwargs, label=label)
     if U is not None:
         plot_constraints(fig, U)
-    ax.set_xlabel('time')
+    ax.set_xlabel(x_label)
     ax.set_ylabel(axes_labels[0])
     ax.set_xlim([0, num_steps])
     ax.grid(visible=True)
